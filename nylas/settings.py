@@ -2,7 +2,6 @@ import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 import os
-import logging
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -45,6 +44,7 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "nylas.urls"
 APPEND_SLASH = True
+AUTH_USER_MODEL = "main.UserAccount"
 
 TEMPLATES = [
     {

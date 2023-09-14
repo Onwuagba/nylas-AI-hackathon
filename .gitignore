@@ -17,3 +17,5 @@ media/
 logs/**
 migrations/
 .TODO
+notes.txt
+Todo
