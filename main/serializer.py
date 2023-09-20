@@ -5,6 +5,8 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers, exceptions
 from rest_framework_simplejwt import serializers as jwt_serializers
 
+from main.models import Annotation
+
 
 class RegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
@@ -75,3 +77,13 @@ class CustomTokenSerializer(jwt_serializers.TokenObtainPairSerializer):
             }
             raise exceptions.AuthenticationFailed(error)
         return super().validate(attrs)
+
+class RetrieveAnnotationSerializer(serializers.ModelSerializer):
+    date_created = serializers.SerializerMethodField(source="created_at")
+
+    class Meta:
+        model = Annotation
+        fields = ["id", "text", "position", "user_email", "annotation_label", "date_created"]
+
+    def get_date_created(self, obj):
+        return obj.created_at.strftime("%Y-%m-%d %H:%M:%S")

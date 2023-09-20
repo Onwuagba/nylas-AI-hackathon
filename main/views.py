@@ -1,13 +1,18 @@
 from django.shortcuts import render
-from rest_framework.permissions import AllowAny
-from rest_framework.generics import CreateAPIView
+from main.models import Annotation
+from main.serializer import CustomTokenSerializer, RegistrationSerializer, RetrieveAnnotationSerializer
 from rest_framework import status
-from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
-
-from main.serializer import RegistrationSerializer, CustomTokenSerializer
+from rest_framework.generics import CreateAPIView, ListAPIView
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
 from rest_framework_simplejwt import views as jwt_views
-from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+import logging
+from rest_framework import filters
+from django_filters.rest_framework import DjangoFilterBackend
+
+logger = logging.getLogger('server_log')
 
 
 class CustomAPIResponse:
@@ -89,4 +94,55 @@ class CustomTokenView(jwt_views.TokenObtainPairView):
             )
 
         response = CustomAPIResponse(message, status_code, code_status)
+        return response.send()
+
+
+class RetrieveAnnotationView(ListAPIView):
+    # permission_classes = (IsAuthenticated,)
+    serializer_class = RetrieveAnnotationSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['created_at', 'user_email', 'annotation_label']
+    search_fields = ['user_email', 'annotation_label', 'text', 'position']
+    ordering_fields = ['created_at']
+
+    def get_queryset(self, thread_id):
+        try:
+            return Annotation.objects.filter(thread_id=thread_id)
+        except Exception as ex:
+            logger.error(
+                f"An exception occurred while retrieving annotations for thread_id - {thread_id}: {ex}"
+            )
+            raise ValidationError("Thread ID does not exist") from ex
+
+    def get(self, request, **kwargs):
+        """
+        Retrieves an annotation for a specific thread.
+
+        Returns:
+            CustomAPIResponse: The response object containing the annotation, status code, and status.
+        """
+        thread_id = kwargs.get("thread_id")
+
+        try:
+            queryset = self.filter_queryset(self.get_queryset(thread_id))
+            if page := self.paginate_queryset(queryset):
+                serializer = self.serializer_class(page, many=True)
+                query_response = self.get_paginated_response(serializer.data)
+                message = query_response.data
+                code = status.HTTP_200_OK
+                _status = "success"
+            else:
+                message = "No annotation found for this thread"
+                code = status.HTTP_400_BAD_REQUEST
+                _status = "failed"
+        except Exception as ex:
+            logger.error(
+                f"Exception in GET RetrieveAnnotation for thread - {thread_id}: {ex}",
+                exc_info=True,
+            )
+            message = ex.args[0]
+            code = status.HTTP_400_BAD_REQUEST
+            _status = "failed"
+
+        response = CustomAPIResponse(message, code, _status)
         return response.send()
