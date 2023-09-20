@@ -207,3 +207,9 @@ class Annotation(BaseModel):
 
     def __str__(self) -> str:
         return self.id
+
+
+class AnnotationComment(BaseModel):
+    text = models.TextField()
+    author_email = models.EmailField(db_index=True, max_length=255)
+    annotation = models.ForeignKey(Annotation, on_delete=models.CASCADE)
