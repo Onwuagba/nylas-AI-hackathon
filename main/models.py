@@ -1,12 +1,15 @@
 import re
-import uuid
+import uuid, base58
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager, PermissionsMixin
 from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import IntegrityError, models
 from django.db.models.query import QuerySet
 from django.utils.translation import gettext_lazy as _
+from django.db import transaction
+
+from main.constants import ANNOTATION
 
 
 def validate_name(value):
@@ -165,3 +168,41 @@ class UserAppointment(BaseModel):
         related_name="user_session",
         null=True,
     )
+
+
+class Annotation(BaseModel):
+    id = models.CharField(primary_key=True, max_length=10)
+    text = models.TextField()
+    position = models.CharField(max_length=255)
+    user_email = models.EmailField(
+        db_index=True, max_length=255
+    )  # not authenticating user
+    annotation_label = models.CharField(max_length=15, choices=ANNOTATION)
+
+    def save(self, *args, **kwargs):
+        if self._state.adding:
+            max_retries = 3
+            for _ in range(max_retries):
+                try:
+                    with transaction.atomic():
+                        self.id = self.generate_key()
+                        return super().save(*args, **kwargs)
+                except IntegrityError:  # for unique constraint cases
+                    continue
+            raise IntegrityError(
+                "Unable to generate a unique key after multiple retries"
+            )
+        return super().save(*args, **kwargs)
+
+    def generate_key(self) -> str:
+        """
+        Generates a random base58-encoded string of length 8.
+
+        Returns:
+            str: A random base58-encoded string of length 8.
+        """
+        base58_id = base58.b58encode(uuid.uuid4().bytes[:10]).decode("utf-8")
+        return base58_id[:8]
+
+    def __str__(self) -> str:
+        return self.id
