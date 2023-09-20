@@ -78,12 +78,21 @@ class CustomTokenSerializer(jwt_serializers.TokenObtainPairSerializer):
             raise exceptions.AuthenticationFailed(error)
         return super().validate(attrs)
 
+
 class RetrieveAnnotationSerializer(serializers.ModelSerializer):
     date_created = serializers.SerializerMethodField(source="created_at")
 
     class Meta:
         model = Annotation
-        fields = ["id", "text", "position", "user_email", "annotation_label", "date_created"]
+        fields = [
+            "id",
+            "text",
+            "position",
+            "user_email",
+            "annotation_label",
+            "date_created",
+            "is_deleted",
+        ]
 
     def get_date_created(self, obj):
         return obj.created_at.strftime("%Y-%m-%d %H:%M:%S")

@@ -10,6 +10,7 @@ from rest_framework_simplejwt import views as jwt_views
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 import logging
 from rest_framework import filters
+from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 
 logger = logging.getLogger('server_log')
@@ -107,12 +108,9 @@ class RetrieveAnnotationView(ListAPIView):
 
     def get_queryset(self, thread_id):
         try:
-            return Annotation.objects.filter(thread_id=thread_id)
-        except Exception as ex:
-            logger.error(
-                f"An exception occurred while retrieving annotations for thread_id - {thread_id}: {ex}"
-            )
-            raise ValidationError("Thread ID does not exist") from ex
+            return Annotation.objects.filter(thread_id__iexact=thread_id)
+        except Annotation.DoesNotExist:
+            raise ValidationError("Thread ID does not exist")
 
     def get(self, request, **kwargs):
         """
@@ -146,3 +144,60 @@ class RetrieveAnnotationView(ListAPIView):
 
         response = CustomAPIResponse(message, code, _status)
         return response.send()
+
+class RetrieveAnnotationDetailView(APIView):
+    """
+    Retrieve, update and delete claim instance
+    """
+     # permission_classes = (IsAuthenticated,)
+    serializer_class = RetrieveAnnotationSerializer
+
+    def get_object(self, id, thread_id):
+        try:
+            return Annotation.objects.get(id__iexact=id, thread_id__iexact=thread_id, is_deleted=False)
+        except:
+            raise ValidationError("No annotation found matching the given parameters")
+
+    def get(self, request, **kwargs):
+        thread_id = kwargs.get("thread_id")
+        annotation_id = kwargs.get("annotation_id")
+
+        try:
+            obj = self.get_object(annotation_id, thread_id)
+            serializer = self.serializer_class(obj)
+            message = serializer.data
+            code = status.HTTP_200_OK
+            _status = "success"
+        except Exception as ex:
+            logger.error(
+                f"Exception in GET RetrieveAnnotationDetailView with thread id {thread_id} and annotation id {annotation_id}: {ex.args[0]}"
+            )
+            message = ex.args[0]
+            code = status.HTTP_400_BAD_REQUEST
+            _status = "failed"
+
+        response = CustomAPIResponse(message, code, _status)
+        return response.send()
+
+    def delete(self, request, **kwargs):
+        thread_id = kwargs.get("thread_id")
+        annotation_id = kwargs.get("annotation_id")
+
+        try:
+            obj = self.get_object(annotation_id, thread_id)
+            obj.is_deleted = True
+            obj.save()
+            message = f"Annotation with id {annotation_id} has been deleted successfully"
+            code = status.HTTP_200_OK
+            _status = "success"
+        except Exception as ex:
+            logger.error(
+                f"Exception in GET RetrieveAnnotationDetailView with thread id {thread_id} and annotation id {annotation_id}: {ex}"
+            )
+            message = ex.args[0]
+            code = status.HTTP_400_BAD_REQUEST
+            _status = "failed"
+
+        response = CustomAPIResponse(message, code, _status)
+        return response.send()
+
