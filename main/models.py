@@ -210,6 +210,13 @@ class Annotation(BaseModel):
 
 
 class AnnotationComment(BaseModel):
-    text = models.TextField()
+    comment = models.TextField()
     author_email = models.EmailField(db_index=True, max_length=255)
     annotation = models.ForeignKey(Annotation, on_delete=models.CASCADE)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["annotation", "author_email", "comment"], name="unique_author_comment"
+            )
+        ]

@@ -2,10 +2,14 @@ import contextlib
 
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
+from django.db import IntegrityError
 from rest_framework import serializers, exceptions
 from rest_framework_simplejwt import serializers as jwt_serializers
 
-from main.models import Annotation
+from main.models import Annotation, AnnotationComment
+import logging
+
+logger = logging.getLogger("server_log")
 
 
 class RegistrationSerializer(serializers.ModelSerializer):
@@ -96,3 +100,30 @@ class RetrieveAnnotationSerializer(serializers.ModelSerializer):
 
     def get_date_created(self, obj):
         return obj.created_at.strftime("%Y-%m-%d %H:%M:%S")
+
+
+class AnnotationCommentSerializer(serializers.ModelSerializer):
+    date_created = serializers.SerializerMethodField(source="created_at")
+
+    class Meta:
+        model = AnnotationComment
+        fields = ["annotation", "comment", "author_email", "date_created"]
+
+    def get_date_created(self, obj):
+        return obj.created_at.strftime("%Y-%m-%d %H:%M:%S")
+
+    def create(self, validated_data):
+        try:
+            query = self.Meta.model.objects.create(**validated_data)
+            query.save()
+
+            return query
+        except IntegrityError as ex:
+            logger.error("An error occurred: %s", ex)
+            if "unique constraint" in str(ex.args):
+                raise serializers.ValidationError(
+                    f"Duplicate comment by {validated_data.get('author_email')} on this annotation"
+                ) from ex
+        except Exception as e:
+            logger.error("An error occurred: %s", e)
+            raise serializers.ValidationError("Oops! Something went wrong") from e

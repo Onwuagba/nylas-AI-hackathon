@@ -1,6 +1,6 @@
 from django.shortcuts import render
-from main.models import Annotation
-from main.serializer import CustomTokenSerializer, RegistrationSerializer, RetrieveAnnotationSerializer
+from main.models import Annotation, AnnotationComment
+from main.serializer import AnnotationCommentSerializer, CustomTokenSerializer, RegistrationSerializer, RetrieveAnnotationSerializer
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import CreateAPIView, ListAPIView
@@ -193,6 +193,76 @@ class RetrieveAnnotationDetailView(APIView):
         except Exception as ex:
             logger.error(
                 f"Exception in GET RetrieveAnnotationDetailView with thread id {thread_id} and annotation id {annotation_id}: {ex}"
+            )
+            message = ex.args[0]
+            code = status.HTTP_400_BAD_REQUEST
+            _status = "failed"
+
+        response = CustomAPIResponse(message, code, _status)
+        return response.send()
+
+class AnnotationCommentView(ListAPIView):
+    # permission_classes = (IsAuthenticated,)
+    serializer_class = AnnotationCommentSerializer
+
+    def get_object(self, annotation_id):
+        try:
+            return Annotation.objects.get(id__iexact=annotation_id)
+        except Annotation.DoesNotExist as ex:
+            raise ValidationError("Invalid annotation id") from ex
+
+    def get_queryset(self, annotation_id):
+        try:
+            return AnnotationComment.objects.filter(annotation__id=annotation_id)
+        except Exception as ex:
+            raise ValidationError("No comments for given annotation") from ex
+
+    def get(self, request, **kwargs):
+        """
+        Get comments for a given annotation
+        """
+        annotation_id = kwargs.get("annotation_id")
+
+        try:
+            queryset = self.get_queryset(annotation_id)
+            if page := self.paginate_queryset(queryset):
+                serializer = self.serializer_class(page, many=True)
+                query_response = self.get_paginated_response(serializer.data)
+                message = query_response.data
+                code = status.HTTP_200_OK
+                _status = "success"
+            else:
+                message = "No comments found for this annotation"
+                code = status.HTTP_400_BAD_REQUEST
+                _status = "failed"
+        except Exception as ex:
+            logger.error(
+                f"Exception in GET annotationcomment with id {annotation_id}: {ex}"
+            )
+            message = ex.args[0]
+            code = status.HTTP_400_BAD_REQUEST
+            _status = "failed"
+
+        response = CustomAPIResponse(message, code, _status)
+        return response.send()
+
+    def post(self, request, *args, **kwargs):
+        """
+        Add comments to a annotation
+        """
+        try:
+            annotation = self.get_object(kwargs.get("annotation_id")).id
+            serializer = self.serializer_class(data={
+                **request.data, "annotation": annotation
+            })
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            message = "Comment posted successfully"
+            code = status.HTTP_201_CREATED
+            _status = "success"
+        except Exception as ex:
+            logger.error(
+                f"Exception in POST annotationcomment with id {kwargs.get('annotation_id')}: {ex}"
             )
             message = ex.args[0]
             code = status.HTTP_400_BAD_REQUEST
