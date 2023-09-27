@@ -107,7 +107,34 @@ class AnnotationCommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AnnotationComment
-        fields = ["annotation", "comment", "author_email", "date_created"]
+        fields = ["id", "annotation", "comment", "author_email", "date_created"]
+
+    def get_date_created(self, obj):
+        return obj.created_at.strftime("%Y-%m-%d %H:%M:%S")
+
+    def create(self, validated_data):
+        try:
+            query = self.Meta.model.objects.create(**validated_data)
+            query.save()
+
+            return query
+        except IntegrityError as ex:
+            logger.error("An error occurred: %s", ex)
+            if "unique constraint" in str(ex.args):
+                raise serializers.ValidationError(
+                    f"Duplicate comment by {validated_data.get('author_email')} on this annotation"
+                ) from ex
+        except Exception as e:
+            logger.error("An error occurred: %s", e)
+            raise serializers.ValidationError("Oops! Something went wrong") from e
+
+
+class AnnotationCommentDetailSerializer(serializers.ModelSerializer):
+    date_created = serializers.SerializerMethodField(source="created_at")
+
+    class Meta:
+        model = AnnotationComment
+        fields = ["id", "annotation_id", "comment", "author_email", "date_created"]
 
     def get_date_created(self, obj):
         return obj.created_at.strftime("%Y-%m-%d %H:%M:%S")

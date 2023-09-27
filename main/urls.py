@@ -1,6 +1,7 @@
 from django.urls import path
 
 from main.views import (
+    AnnotationCommentDetailView,
     AnnotationCommentView,
     RetrieveAnnotationDetailView,
     RetrieveAnnotationView,
@@ -15,7 +16,11 @@ urlpatterns = [
         RetrieveAnnotationDetailView.as_view(),
     ),
     path(
-        "threads/annotation/<str:annotation_id>/comment",
+        "threads/annotation/<str:annotation_id>/comment/",
         AnnotationCommentView.as_view(),
+    ),
+    path(
+        "threads/annotation/<str:annotation_id>/comment/<int:comment_id>/",
+        AnnotationCommentDetailView.as_view(),
     ),
 ]

@@ -1,9 +1,20 @@
+from datetime import datetime, timedelta
 from django.shortcuts import render
 from main.models import Annotation, AnnotationComment
-from main.serializer import AnnotationCommentSerializer, CustomTokenSerializer, RegistrationSerializer, RetrieveAnnotationSerializer
+from main.serializer import (
+    AnnotationCommentDetailSerializer,
+    AnnotationCommentSerializer,
+    CustomTokenSerializer,
+    RegistrationSerializer,
+    RetrieveAnnotationSerializer,
+)
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import CreateAPIView, ListAPIView
+from rest_framework.generics import (
+    CreateAPIView,
+    ListAPIView,
+    RetrieveUpdateDestroyAPIView,
+)
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt import views as jwt_views
@@ -11,9 +22,10 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 import logging
 from rest_framework import filters
 from rest_framework.views import APIView
+from datetime import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 
-logger = logging.getLogger('server_log')
+logger = logging.getLogger("server_log")
 
 
 class CustomAPIResponse:
@@ -100,11 +112,12 @@ class CustomTokenView(jwt_views.TokenObtainPairView):
 
 class RetrieveAnnotationView(ListAPIView):
     # permission_classes = (IsAuthenticated,)
+    http_method_names = ["get"]
     serializer_class = RetrieveAnnotationSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_fields = ['created_at', 'user_email', 'annotation_label']
-    search_fields = ['user_email', 'annotation_label', 'text', 'position']
-    ordering_fields = ['created_at']
+    filterset_fields = ["created_at", "user_email", "annotation_label"]
+    search_fields = ["user_email", "annotation_label", "text", "position"]
+    ordering_fields = ["created_at"]
 
     def get_queryset(self, thread_id):
         try:
@@ -145,16 +158,21 @@ class RetrieveAnnotationView(ListAPIView):
         response = CustomAPIResponse(message, code, _status)
         return response.send()
 
-class RetrieveAnnotationDetailView(APIView):
+
+class RetrieveAnnotationDetailView(RetrieveUpdateDestroyAPIView):
     """
-    Retrieve, update and delete claim instance
+    Retrieve, update and delete annotation instance
     """
-     # permission_classes = (IsAuthenticated,)
+
+    # permission_classes = (IsAuthenticated,)
+    http_method_names = ["get", "patch", "delete"]
     serializer_class = RetrieveAnnotationSerializer
 
     def get_object(self, id, thread_id):
         try:
-            return Annotation.objects.get(id__iexact=id, thread_id__iexact=thread_id, is_deleted=False)
+            return Annotation.objects.get(
+                id__iexact=id, thread_id__iexact=thread_id, is_deleted=False
+            )
         except:
             raise ValidationError("No annotation found matching the given parameters")
 
@@ -187,7 +205,9 @@ class RetrieveAnnotationDetailView(APIView):
             obj = self.get_object(annotation_id, thread_id)
             obj.is_deleted = True
             obj.save()
-            message = f"Annotation with id {annotation_id} has been deleted successfully"
+            message = (
+                f"Annotation with id {annotation_id} has been deleted successfully"
+            )
             code = status.HTTP_200_OK
             _status = "success"
         except Exception as ex:
@@ -201,8 +221,9 @@ class RetrieveAnnotationDetailView(APIView):
         response = CustomAPIResponse(message, code, _status)
         return response.send()
 
+
 class AnnotationCommentView(ListAPIView):
-    # permission_classes = (IsAuthenticated,)
+    http_method_names = ["get", "post"]
     serializer_class = AnnotationCommentSerializer
 
     def get_object(self, annotation_id):
@@ -252,9 +273,9 @@ class AnnotationCommentView(ListAPIView):
         """
         try:
             annotation = self.get_object(kwargs.get("annotation_id")).id
-            serializer = self.serializer_class(data={
-                **request.data, "annotation": annotation
-            })
+            serializer = self.serializer_class(
+                data={**request.data, "annotation": annotation}
+            )
             serializer.is_valid(raise_exception=True)
             serializer.save()
             message = "Comment posted successfully"
@@ -271,3 +292,88 @@ class AnnotationCommentView(ListAPIView):
         response = CustomAPIResponse(message, code, _status)
         return response.send()
 
+
+class AnnotationCommentDetailView(RetrieveUpdateDestroyAPIView):
+    http_method_names = ["get", "patch", "delete"]
+    serializer_class = AnnotationCommentDetailSerializer
+
+    def get_object(self, annotation_id, comment_id):
+        try:
+            obj = AnnotationComment.objects.get(
+                id=comment_id, annotation__id=annotation_id, is_deleted=False
+            )
+            time_difference = datetime.now(timezone.utc) - obj.created_at
+            if time_difference > timedelta(hours=24):
+                raise ValidationError("Comments cannot be acted on after 24 hours")
+            return obj
+        except AnnotationComment.DoesNotExist as ex:
+            raise ValidationError(
+                "No comment found matching the given annotation"
+            ) from ex
+
+    def get(self, request, **kwargs):
+        """
+        Get single comment instance for a given annotation
+        """
+        annotation_id = kwargs.get("annotation_id")
+        comment_id = kwargs.get("comment_id")
+
+        try:
+            obj = self.get_object(annotation_id, comment_id)
+            serializer = self.serializer_class(obj)
+            message = serializer.data
+            code = status.HTTP_200_OK
+            _status = "success"
+        except Exception as ex:
+            logger.error(
+                f"Exception in GET AnnotationCommentDetailView with annotation id {annotation_id}, comment id {comment_id}: {ex}"
+            )
+            message = ex.args[0]
+            code = status.HTTP_400_BAD_REQUEST
+            _status = "failed"
+
+        response = CustomAPIResponse(message, code, _status)
+        return response.send()
+
+    def patch(self, request, *args, **kwargs):
+        """
+        update comment on an annotation
+        """
+        annotation_id = kwargs.get("annotation_id")
+        comment_id = kwargs.get("comment_id")
+        allowed_update_fields = {"comment"}
+
+        if not request.data:
+            response = CustomAPIResponse(
+                "No comment id provided to update",
+                status.HTTP_400_BAD_REQUEST,
+                "failed",
+            )
+            return response.send()
+
+        if not set(request.data.keys()).issubset(allowed_update_fields):
+            response = CustomAPIResponse(
+                "You can only update comment on annotations",
+                status.HTTP_400_BAD_REQUEST,
+                "failed",
+            )
+            return response.send()
+
+        try:
+            obj = self.get_object(annotation_id, comment_id)
+            serializer = self.serializer_class(obj, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            message = "Comment updated successfully"
+            code = status.HTTP_200_OK
+            _status = "success"
+        except Exception as ex:
+            logger.error(
+                f"Exception in PATCH AnnotationCommentDetailView with annotation id {annotation_id}, comment id {comment_id}: {ex}"
+            )
+            message = ex.args[0]
+            code = status.HTTP_400_BAD_REQUEST
+            _status = "failed"
+
+        response = CustomAPIResponse(message, code, _status)
+        return response.send()
