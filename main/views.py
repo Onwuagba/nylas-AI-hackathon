@@ -197,6 +197,29 @@ class RetrieveAnnotationDetailView(RetrieveUpdateDestroyAPIView):
         response = CustomAPIResponse(message, code, _status)
         return response.send()
 
+    def patch(self, request, **kwargs):
+        thread_id = kwargs.get("thread_id")
+        annotation_id = kwargs.get("annotation_id")
+
+        try:
+            obj = self.get_object(annotation_id, thread_id)
+            serializer = self.serializer_class(obj, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            message = "Annotation updated successfully"
+            code = status.HTTP_200_OK
+            _status = "success"
+        except Exception as ex:
+            logger.error(
+                f"Exception in PATCH RetrieveAnnotationDetailView with id {annotation_id}: {ex}"
+            )
+            message = ex.args[0]
+            code = status.HTTP_400_BAD_REQUEST
+            _status = "failed"
+
+        response = CustomAPIResponse(message, code, _status)
+        return response.send()
+
     def delete(self, request, **kwargs):
         thread_id = kwargs.get("thread_id")
         annotation_id = kwargs.get("annotation_id")
