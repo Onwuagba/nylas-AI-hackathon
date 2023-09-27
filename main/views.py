@@ -377,3 +377,28 @@ class AnnotationCommentDetailView(RetrieveUpdateDestroyAPIView):
 
         response = CustomAPIResponse(message, code, _status)
         return response.send()
+
+    def delete(self, request, **kwargs):
+        """
+        delete single comment instance for a given annotation
+        """
+        annotation_id = kwargs.get("annotation_id")
+        comment_id = kwargs.get("comment_id")
+
+        try:
+            obj = self.get_object(annotation_id, comment_id)
+            obj.is_deleted = True
+            obj.save()
+            message = "Comment deleted successfully"
+            code = status.HTTP_200_OK
+            _status = "success"
+        except Exception as ex:
+            logger.error(
+                f"Exception in GET AnnotationCommentDetailView with annotation id {annotation_id}, comment id {comment_id}: {ex}"
+            )
+            message = ex.args[0]
+            code = status.HTTP_400_BAD_REQUEST
+            _status = "failed"
+
+        response = CustomAPIResponse(message, code, _status)
+        return response.send()
