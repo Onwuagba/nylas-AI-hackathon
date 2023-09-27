@@ -320,7 +320,7 @@ class AnnotationCommentDetailView(RetrieveUpdateDestroyAPIView):
     http_method_names = ["get", "patch", "delete"]
     serializer_class = AnnotationCommentDetailSerializer
 
-    def get_object(self, annotation_id, comment_id):
+    def get_object(self, annotation_id, comment_id, user):
         try:
             obj = AnnotationComment.objects.get(
                 id=comment_id, annotation__id=annotation_id, is_deleted=False
@@ -328,6 +328,8 @@ class AnnotationCommentDetailView(RetrieveUpdateDestroyAPIView):
             time_difference = datetime.now(timezone.utc) - obj.created_at
             if time_difference > timedelta(hours=24):
                 raise ValidationError("Comments cannot be acted on after 24 hours")
+            if obj.author_email != user:
+                raise ValidationError("Permission denied")
             return obj
         except AnnotationComment.DoesNotExist as ex:
             raise ValidationError(
@@ -342,7 +344,9 @@ class AnnotationCommentDetailView(RetrieveUpdateDestroyAPIView):
         comment_id = kwargs.get("comment_id")
 
         try:
-            obj = self.get_object(annotation_id, comment_id)
+            obj = self.get_object(
+                annotation_id, comment_id, request.data.get("author_email")
+            )  # since we don't manage authentication
             serializer = self.serializer_class(obj)
             message = serializer.data
             code = status.HTTP_200_OK
@@ -383,7 +387,9 @@ class AnnotationCommentDetailView(RetrieveUpdateDestroyAPIView):
             return response.send()
 
         try:
-            obj = self.get_object(annotation_id, comment_id)
+            obj = self.get_object(
+                annotation_id, comment_id, request.data.get("author_email")
+            )  # since we don't manage authentication
             serializer = self.serializer_class(obj, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
@@ -409,7 +415,9 @@ class AnnotationCommentDetailView(RetrieveUpdateDestroyAPIView):
         comment_id = kwargs.get("comment_id")
 
         try:
-            obj = self.get_object(annotation_id, comment_id)
+            obj = self.get_object(
+                annotation_id, comment_id, request.data.get("author_email")
+            )  # since we don't manage authentication
             obj.is_deleted = True
             obj.save()
             message = "Comment deleted successfully"
