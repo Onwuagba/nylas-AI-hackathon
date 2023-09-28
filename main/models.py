@@ -172,7 +172,7 @@ class UserAppointment(BaseModel):
 
 class Annotation(BaseModel):
     id = models.CharField(primary_key=True, max_length=10)
-    thread_id = models.CharField(max_length=20)
+    email_id = models.CharField(max_length=20)
     text = models.TextField()
     position = models.CharField(max_length=255)
     user_email = models.EmailField(
@@ -211,7 +211,7 @@ class Annotation(BaseModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["thread_id", "annotation_label", "user_email", "position"],
+                fields=["email_id", "annotation_label", "user_email", "position"],
                 name="unique_thread_annotation",
             )
         ]

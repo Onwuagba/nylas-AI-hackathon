@@ -10,9 +10,9 @@ from main.views import (
 app_name = "main"
 
 urlpatterns = [
-    path("threads/<str:thread_id>/annotation/", RetrieveAnnotationView.as_view()),
+    path("threads/<str:email_id>/annotation/", RetrieveAnnotationView.as_view()),
     path(
-        "threads/<str:thread_id>/annotation/<str:annotation_id>/",
+        "threads/<str:email_id>/annotation/<str:annotation_id>/",
         RetrieveAnnotationDetailView.as_view(),
     ),
     path(

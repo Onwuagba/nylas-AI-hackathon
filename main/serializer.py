@@ -91,7 +91,7 @@ class RetrieveAnnotationSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "text",
-            "thread_id",
+            "email_id",
             "position",
             "user_email",
             "annotation_label",

@@ -120,10 +120,10 @@ class RetrieveAnnotationView(ListCreateAPIView):
     search_fields = ["user_email", "annotation_label", "text", "position"]
     ordering_fields = ["created_at"]
 
-    def get_queryset(self, thread_id):
+    def get_queryset(self, email_id):
         try:
             return Annotation.objects.filter(
-                thread_id__iexact=thread_id, is_deleted=False
+                email_id__iexact=email_id, is_deleted=False
             )
         except Annotation.DoesNotExist as e:
             raise ValidationError("Thread ID does not exist") from e
@@ -135,10 +135,10 @@ class RetrieveAnnotationView(ListCreateAPIView):
         Returns:
             CustomAPIResponse: The response object containing the annotation, status code, and status.
         """
-        thread_id = kwargs.get("thread_id")
+        email_id = kwargs.get("email_id")
 
         try:
-            queryset = self.filter_queryset(self.get_queryset(thread_id))
+            queryset = self.filter_queryset(self.get_queryset(email_id))
             if page := self.paginate_queryset(queryset):
                 serializer = self.serializer_class(page, many=True)
                 query_response = self.get_paginated_response(serializer.data)
@@ -151,7 +151,7 @@ class RetrieveAnnotationView(ListCreateAPIView):
                 _status = "failed"
         except Exception as ex:
             logger.error(
-                f"Exception in GET RetrieveAnnotation for thread - {thread_id}: {ex}",
+                f"Exception in GET RetrieveAnnotation for thread - {email_id}: {ex}",
             )
             message = ex.args[0]
             code = status.HTTP_400_BAD_REQUEST
@@ -170,13 +170,13 @@ class RetrieveAnnotationView(ListCreateAPIView):
             annotation_label (string): choices defining type of annotation
 
         """
-        thread_id = kwargs.get("thread_id")
+        email_id = kwargs.get("email_id")
 
         try:
-            # confirm thread_id is valid
-            # confirm_thread_id(thread_id)
+            # confirm email_id is valid
+            # confirm_email_id(email_id)
             serializer = self.serializer_class(
-                data={**request.data, "thread_id": thread_id}
+                data={**request.data, "email_id": email_id}
             )
             serializer.is_valid(raise_exception=True)
             serializer.save()
@@ -201,27 +201,27 @@ class RetrieveAnnotationDetailView(RetrieveUpdateDestroyAPIView):
     http_method_names = ["get", "patch", "delete"]
     serializer_class = RetrieveAnnotationSerializer
 
-    def get_object(self, id, thread_id):
+    def get_object(self, id, email_id):
         try:
             return Annotation.objects.get(
-                id__iexact=id, thread_id__iexact=thread_id, is_deleted=False
+                id__iexact=id, email_id__iexact=email_id, is_deleted=False
             )
         except:
             raise ValidationError("No annotation found matching the given parameters")
 
     def get(self, request, **kwargs):
-        thread_id = kwargs.get("thread_id")
+        email_id = kwargs.get("email_id")
         annotation_id = kwargs.get("annotation_id")
 
         try:
-            obj = self.get_object(annotation_id, thread_id)
+            obj = self.get_object(annotation_id, email_id)
             serializer = self.serializer_class(obj)
             message = serializer.data
             code = status.HTTP_200_OK
             _status = "success"
         except Exception as ex:
             logger.error(
-                f"Exception in GET RetrieveAnnotationDetailView with thread id {thread_id} and annotation id {annotation_id}: {ex.args[0]}"
+                f"Exception in GET RetrieveAnnotationDetailView with thread id {email_id} and annotation id {annotation_id}: {ex.args[0]}"
             )
             message = ex.args[0]
             code = status.HTTP_400_BAD_REQUEST
@@ -231,11 +231,11 @@ class RetrieveAnnotationDetailView(RetrieveUpdateDestroyAPIView):
         return response.send()
 
     def patch(self, request, **kwargs):
-        thread_id = kwargs.get("thread_id")
+        email_id = kwargs.get("email_id")
         annotation_id = kwargs.get("annotation_id")
 
         try:
-            obj = self.get_object(annotation_id, thread_id)
+            obj = self.get_object(annotation_id, email_id)
             serializer = self.serializer_class(obj, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
@@ -254,11 +254,11 @@ class RetrieveAnnotationDetailView(RetrieveUpdateDestroyAPIView):
         return response.send()
 
     def delete(self, request, **kwargs):
-        thread_id = kwargs.get("thread_id")
+        email_id = kwargs.get("email_id")
         annotation_id = kwargs.get("annotation_id")
 
         try:
-            obj = self.get_object(annotation_id, thread_id)
+            obj = self.get_object(annotation_id, email_id)
             obj.is_deleted = True
             obj.save()
             message = (
@@ -268,7 +268,7 @@ class RetrieveAnnotationDetailView(RetrieveUpdateDestroyAPIView):
             _status = "success"
         except Exception as ex:
             logger.error(
-                f"Exception in GET RetrieveAnnotationDetailView with thread id {thread_id} and annotation id {annotation_id}: {ex}"
+                f"Exception in GET RetrieveAnnotationDetailView with thread id {email_id} and annotation id {annotation_id}: {ex}"
             )
             message = ex.args[0]
             code = status.HTTP_400_BAD_REQUEST
