@@ -13,6 +13,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.generics import (
     CreateAPIView,
     ListAPIView,
+    ListCreateAPIView,
     RetrieveUpdateDestroyAPIView,
 )
 from rest_framework.permissions import AllowAny
@@ -110,9 +111,9 @@ class CustomTokenView(jwt_views.TokenObtainPairView):
         return response.send()
 
 
-class RetrieveAnnotationView(ListAPIView):
+class RetrieveAnnotationView(ListCreateAPIView):
     # permission_classes = (IsAuthenticated,)
-    http_method_names = ["get"]
+    http_method_names = ["get", "post"]
     serializer_class = RetrieveAnnotationSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ["created_at", "user_email", "annotation_label"]
@@ -121,9 +122,11 @@ class RetrieveAnnotationView(ListAPIView):
 
     def get_queryset(self, thread_id):
         try:
-            return Annotation.objects.filter(thread_id__iexact=thread_id)
-        except Annotation.DoesNotExist:
-            raise ValidationError("Thread ID does not exist")
+            return Annotation.objects.filter(
+                thread_id__iexact=thread_id, is_deleted=False
+            )
+        except Annotation.DoesNotExist as e:
+            raise ValidationError("Thread ID does not exist") from e
 
     def get(self, request, **kwargs):
         """
@@ -149,9 +152,39 @@ class RetrieveAnnotationView(ListAPIView):
         except Exception as ex:
             logger.error(
                 f"Exception in GET RetrieveAnnotation for thread - {thread_id}: {ex}",
-                exc_info=True,
             )
             message = ex.args[0]
+            code = status.HTTP_400_BAD_REQUEST
+            _status = "failed"
+
+        response = CustomAPIResponse(message, code, _status)
+        return response.send()
+
+    def post(self, request, **kwargs):
+        """create new annotation
+
+        Args:
+            text (string): content of the new annotation
+            position (string): position of the new annotation
+            email (string): email address of the annotator
+            annotation_label (string): choices defining type of annotation
+
+        """
+        thread_id = kwargs.get("thread_id")
+
+        try:
+            # confirm thread_id is valid
+            # confirm_thread_id(thread_id)
+            serializer = self.serializer_class(
+                data={**request.data, "thread_id": thread_id}
+            )
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            message = "Annotation successfully created"
+            code = status.HTTP_201_CREATED
+            _status = "success"
+        except Exception as e:
+            message = e.args[0]
             code = status.HTTP_400_BAD_REQUEST
             _status = "failed"
 

@@ -182,13 +182,16 @@ class Annotation(BaseModel):
 
     def save(self, *args, **kwargs):
         if self._state.adding:
-            max_retries = 3
+            max_retries = 5
             for _ in range(max_retries):
                 try:
                     with transaction.atomic():
                         self.id = self.generate_key()
                         return super().save(*args, **kwargs)
-                except IntegrityError:  # for unique constraint cases
+                except IntegrityError as e:
+                    # Check if the IntegrityError is due to the "unique_thread_annotation" constraint
+                    if "unique_thread_annotation" in str(e.__cause__):
+                        raise e
                     continue
             raise IntegrityError(
                 "Unable to generate a unique key after multiple retries"
@@ -205,6 +208,14 @@ class Annotation(BaseModel):
         base58_id = base58.b58encode(uuid.uuid4().bytes[:10]).decode("utf-8")
         return base58_id[:8]
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["thread_id", "annotation_label", "user_email", "position"],
+                name="unique_thread_annotation",
+            )
+        ]
+
     def __str__(self) -> str:
         return self.id
 
@@ -217,6 +228,7 @@ class AnnotationComment(BaseModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["annotation", "author_email", "comment"], name="unique_author_comment"
+                fields=["annotation", "author_email", "comment"],
+                name="unique_author_comment",
             )
         ]

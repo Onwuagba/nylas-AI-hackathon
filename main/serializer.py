@@ -91,15 +91,33 @@ class RetrieveAnnotationSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "text",
+            "thread_id",
             "position",
             "user_email",
             "annotation_label",
             "date_created",
             "is_deleted",
         ]
+        read_only_fields = ("id",)
 
     def get_date_created(self, obj):
         return obj.created_at.strftime("%Y-%m-%d %H:%M:%S")
+
+    def create(self, validated_data):
+        try:
+            query = self.Meta.model.objects.create(**validated_data)
+            query.save()
+
+            return query
+        except IntegrityError as ex:
+            logger.error("An error occurred saving annotation: %s", ex)
+            if "unique constraint" in str(ex.args):
+                raise serializers.ValidationError(
+                    "You already created notes similar to this on current annotation"
+                ) from ex
+        except Exception as e:
+            logger.error("An error occurred saving annotation: %s", e)
+            raise serializers.ValidationError("Oops! Something went wrong") from e
 
 
 class AnnotationCommentSerializer(serializers.ModelSerializer):
