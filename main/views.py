@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from django.shortcuts import render
+from main.helper import confirm_email_id
 from main.models import Annotation, AnnotationComment
 from main.serializer import (
     AnnotationCommentDetailSerializer,
@@ -173,8 +174,7 @@ class RetrieveAnnotationView(ListCreateAPIView):
         email_id = kwargs.get("email_id")
 
         try:
-            # confirm email_id is valid
-            # confirm_email_id(email_id)
+            confirm_email_id(email_id)
             serializer = self.serializer_class(
                 data={**request.data, "email_id": email_id}
             )
