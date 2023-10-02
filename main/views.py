@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from django.shortcuts import render
-from main.helper import auto_create_annotation, confirm_email_id
+from main.helper import auto_create_annotation, confirm_email_and_participants
 from main.models import Annotation, AnnotationComment
 from main.serializer import (
     AnnotationCommentDetailSerializer,
@@ -113,7 +113,6 @@ class CustomTokenView(jwt_views.TokenObtainPairView):
 
 
 class RetrieveAnnotationView(ListCreateAPIView):
-    # permission_classes = (IsAuthenticated,)
     http_method_names = ["get", "post"]
     serializer_class = RetrieveAnnotationSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
@@ -127,11 +126,11 @@ class RetrieveAnnotationView(ListCreateAPIView):
                 email_id__iexact=email_id, is_deleted=False
             )
         except Annotation.DoesNotExist as e:
-            raise ValidationError("Thread ID does not exist") from e
+            raise ValidationError("Email ID does not exist") from e
 
     def get(self, request, **kwargs):
         """
-        Retrieves an annotation for a specific thread.
+        Retrieves an annotation for a specific email.
 
         Returns:
             CustomAPIResponse: The response object containing the annotation, status code, and status.
@@ -166,15 +165,21 @@ class RetrieveAnnotationView(ListCreateAPIView):
 
         Args:
             text (string): content of the new annotation
-            position (string): position of the new annotation
             email (string): email address of the annotator
             annotation_label (string): choices defining type of annotation
 
         """
         email_id = kwargs.get("email_id")
+        email = request.data.get("user_email")
 
         try:
-            confirm_email_id(email_id)
+            email_participants = confirm_email_and_participants(email_id)
+            print(email_participants)
+            if email not in email_participants:
+                raise ValidationError(
+                    "Annotator email address not a part of this email thread"
+                )
+
             serializer = self.serializer_class(
                 data={**request.data, "email_id": email_id}
             )
@@ -472,11 +477,12 @@ class AutoCreateAnnotationView(CreateAPIView):
     """
     create annotation by passing text
     """
+
     http_method_names = ["post"]
 
     def check_data(self, data):
-        if 'text' not in data:
-            raise ValidationError('Text is required')
+        if "text" not in data:
+            raise ValidationError("Text is required")
 
     def post(self, request, *args, **kwargs):
         """
@@ -484,14 +490,12 @@ class AutoCreateAnnotationView(CreateAPIView):
         """
         try:
             self.check_data(request.data)
-            data = auto_create_annotation(request.data.get('text'))
+            data = auto_create_annotation(request.data.get("text"))
             message = data
             code = status.HTTP_201_CREATED
             _status = "success"
         except Exception as ex:
-            logger.error(
-                f"Exception in POST AutoCreateAnnotationView: {ex}"
-            )
+            logger.error(f"Exception in POST AutoCreateAnnotationView: {ex}")
             message = ex.args[0]
             code = status.HTTP_400_BAD_REQUEST
             _status = "failed"

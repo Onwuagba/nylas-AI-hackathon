@@ -13,7 +13,7 @@ openai.api_key = os.getenv("OPEN_AI_TOKEN")
 
 
 # confirm email id
-def confirm_email_id(email_id):
+def confirm_email_and_participants(email_id):
     """
     Confirms the provided email ID by calling Nylas messages API
     If the email ID is confirmed successfully, the response JSON is printed.
@@ -40,17 +40,53 @@ def confirm_email_id(email_id):
     url = f"{base_url}/messages/{email_id}"
 
     try:
-        res = requests.get(url, headers=header, timeout=(60, 90))
-        res_json = res.json()
-        if res.status_code != 200 or "message" in res_json:
-            raise ValueError(res_json.get("message") or "Unable to confirm email id")
-
-        if email_id != res_json.get("id"):
-            raise ValueError("Unable to confirm email id")
-        print(res_json)
+        return _confirm_email_extract(url, header, email_id)
     except Exception as ex:
         logger.error("Error confirming email id: %s", ex)
         raise ValueError(ex.args[0] or "An error occurred confirming email") from ex
+
+
+def _confirm_email_extract(url, header, email_id):
+    """
+    The method retrieves the email participants from the JSON object and returns them as a list.
+
+    Args:
+        json_obj: The JSON object containing the email details.
+
+    Returns:
+        List[str]: A list of email participants.
+
+    Raises:
+        ValueError: Raised when the email confirmation fails or the email participants cannot be retrieved.
+
+    """
+    res = requests.get(url, headers=header, timeout=(60, 90))
+    res_json = res.json()
+    if res.status_code != 200 or "message" in res_json:
+        raise ValueError(res_json.get("message") or "Unable to confirm email id")
+
+    if email_id != res_json.get("id"):
+        raise ValueError("Unable to confirm email id")
+
+    if email_participants := confirm_email_participant(res_json):
+        return email_participants
+    else:
+        raise ValueError("Email participants cannot be retrieved at this time")
+
+
+def confirm_email_participant(json_obj):
+    email_list = []
+
+    if obj_list := json_obj.get("cc"):
+        for emails in obj_list:
+            email_list.extend(em.get("email") for em in emails)
+    email_list.extend(
+        (
+            json_obj.get("from")[0].get("email"),
+            json_obj.get("to")[0].get("email"),
+        )
+    )
+    return email_list
 
 
 def auto_create_annotation(text):

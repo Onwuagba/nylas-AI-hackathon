@@ -172,9 +172,9 @@ class UserAppointment(BaseModel):
 
 class Annotation(BaseModel):
     id = models.CharField(primary_key=True, max_length=10)
-    email_id = models.CharField(max_length=20)
+    email_id = models.CharField(max_length=50)
     text = models.TextField()
-    position = models.CharField(max_length=255)
+    position = models.CharField(max_length=255, null=True, blank=True)
     user_email = models.EmailField(
         db_index=True, max_length=255
     )  # not authenticating user
@@ -211,7 +211,7 @@ class Annotation(BaseModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["email_id", "annotation_label", "user_email", "position"],
+                fields=["email_id", "annotation_label", "user_email"],
                 name="unique_thread_annotation",
             )
         ]
