@@ -13,7 +13,8 @@
 
 ## Running project 
 -  Once project is completely [setup](#getting-started), simply  run the following command: `python manage.py runserver <port:optional>`
-- Import project collection to your API tool (postman, insomnia, etc.) Collection is titled "<b>collections.json</b>".
+- Import project collection to your API tool (postman, insomnia, etc.) Collection is titled "<b>collections.json</b>"
+- Test API
 
 
 
