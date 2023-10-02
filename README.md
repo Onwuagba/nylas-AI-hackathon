@@ -4,6 +4,7 @@
 
 ## Getting started
 - This project requires python to run locally
+- Project was initially deployed to pythonanywhere but it was discovered that the api can't connect to Nylas and so had to be pulled. 
 - [ ] Clone repo
 - [ ] Install dependencies: `pip install requirements.txt`
 - [ ] Create a copy of the env file and rename to <b>.env</b>
