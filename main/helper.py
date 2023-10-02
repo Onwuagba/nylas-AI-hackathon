@@ -1,4 +1,6 @@
+import ast
 import os, requests
+import openai
 from dotenv import load_dotenv
 import logging
 
@@ -6,6 +8,8 @@ load_dotenv()
 base_url = os.getenv("NYLAS_BASE_URL")
 auth = os.getenv("NLYAS_AUTH")
 logger = logging.getLogger("server_log")
+
+openai.api_key = os.getenv("OPEN_AI_TOKEN")
 
 
 # confirm email id
@@ -23,10 +27,6 @@ def confirm_email_id(email_id):
     Raises:
         ValueError: If the email ID is not provided, or if there is an error confirming the email ID.
 
-    Example:
-        ```python
-        confirm_email_id("example@example.com")
-        ```
     """
 
     if not email_id:
@@ -51,3 +51,43 @@ def confirm_email_id(email_id):
     except Exception as ex:
         logger.error("Error confirming email id: %s", ex)
         raise ValueError(ex.args[0] or "An error occurred confirming email") from ex
+
+
+def auto_create_annotation(text):
+    if not text:
+        raise ValueError("Please provide a text to create an annotation")
+
+    if len(text) > 300:
+        raise ValueError("Text cannot exceed 300 characters")
+
+    prompt = f"Given the user input '{text}', categorize the text under one or more of the following labels:\n- Task\n- Meeting Request\n- Follow-up\n- Question\n- Deadline\n- Approval\n- Feedback\n- Review. Ensure the response returns a python dictionary with the format 'Category: <label>, Annotation: <selected_text>', with no additional text."
+
+    try:
+        response = openai.Completion.create(
+            engine="text-davinci-003", prompt=prompt, max_tokens=200
+        )
+
+        res = response.choices[0].text.strip().replace("\n", "").split(";")
+        print(res)
+        resp = []
+
+        for val in res:
+            if "Category" not in val:
+                new_val = val.split(":")
+                resp.append({"Category": new_val[0], "Annotation": new_val[1]})
+            elif isinstance(val, str):
+                response_dict = ast.literal_eval(val)
+                if isinstance(response_dict, dict):
+                    resp.append(response_dict)
+                else:
+                    for vv in response_dict:
+                        resp.append(vv)
+
+            else:
+                resp = res
+
+        return resp
+
+    except Exception as ex:
+        logger.error("Error generating annotation for text:%s,  %s", text, ex)
+        return "Error generating annotation"

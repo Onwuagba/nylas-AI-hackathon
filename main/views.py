@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from django.shortcuts import render
-from main.helper import confirm_email_id
+from main.helper import auto_create_annotation, confirm_email_id
 from main.models import Annotation, AnnotationComment
 from main.serializer import (
     AnnotationCommentDetailSerializer,
@@ -459,6 +459,38 @@ class AnnotationCommentDetailView(RetrieveUpdateDestroyAPIView):
         except Exception as ex:
             logger.error(
                 f"Exception in GET AnnotationCommentDetailView with annotation id {annotation_id}, comment id {comment_id}: {ex}"
+            )
+            message = ex.args[0]
+            code = status.HTTP_400_BAD_REQUEST
+            _status = "failed"
+
+        response = CustomAPIResponse(message, code, _status)
+        return response.send()
+
+
+class AutoCreateAnnotationView(CreateAPIView):
+    """
+    create annotation by passing text
+    """
+    http_method_names = ["post"]
+
+    def check_data(self, data):
+        if 'text' not in data:
+            raise ValidationError('Text is required')
+
+    def post(self, request, *args, **kwargs):
+        """
+        Create new annotation using AI
+        """
+        try:
+            self.check_data(request.data)
+            data = auto_create_annotation(request.data.get('text'))
+            message = data
+            code = status.HTTP_201_CREATED
+            _status = "success"
+        except Exception as ex:
+            logger.error(
+                f"Exception in POST AutoCreateAnnotationView: {ex}"
             )
             message = ex.args[0]
             code = status.HTTP_400_BAD_REQUEST
