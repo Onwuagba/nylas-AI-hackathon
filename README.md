@@ -14,7 +14,7 @@
 ## Running project 
 -  Once project is completely [setup](#getting-started), simply  run the following command: `python manage.py runserver <port:optional>`
 - Import project collection to your API tool (postman, insomnia, etc.) Collection is titled "<b>collections.json</b>"
-- Test API
+- [![Run in Insomnia}](https://insomnia.rest/images/run.svg)](https://insomnia.rest/run/?label=LinkLoom%20API&uri=https%3A%2F%2Fgithub.com%2FOnwuagba%2Fnylas-AI-hackathon%2Fblob%2Fdevelop%2Fcollection.json)
 
 
 
