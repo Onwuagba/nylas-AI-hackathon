@@ -3,6 +3,7 @@
 
 
 ## Getting started
+- This project requires python to run locally
 - [ ] Clone repo
 - [ ] Install dependencies: `pip install requirements.txt`
 - [ ] Create a copy of the env file and rename to <b>.env</b>
