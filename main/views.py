@@ -146,7 +146,7 @@ class RetrieveAnnotationView(ListCreateAPIView):
                 code = status.HTTP_200_OK
                 _status = "success"
             else:
-                message = "No annotation found for this thread"
+                message = "No annotation found for this email"
                 code = status.HTTP_400_BAD_REQUEST
                 _status = "failed"
         except Exception as ex:
@@ -167,7 +167,6 @@ class RetrieveAnnotationView(ListCreateAPIView):
             text (string): content of the new annotation
             email (string): email address of the annotator
             annotation_label (string): choices defining type of annotation
-
         """
         email_id = kwargs.get("email_id")
         email = request.data.get("user_email")
@@ -238,8 +237,16 @@ class RetrieveAnnotationDetailView(RetrieveUpdateDestroyAPIView):
     def patch(self, request, **kwargs):
         email_id = kwargs.get("email_id")
         annotation_id = kwargs.get("annotation_id")
+        email = request.data.get("user_email")
 
         try:
+            email_participants = confirm_email_and_participants(email_id)
+
+            if email not in email_participants:
+                raise ValidationError(
+                    "Annotator email address not a part of this email thread"
+                )
+
             obj = self.get_object(annotation_id, email_id)
             serializer = self.serializer_class(obj, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
@@ -332,8 +339,18 @@ class AnnotationCommentView(ListAPIView):
         """
         Add comments to a annotation
         """
+        email = request.data.get("author_email")
+
         try:
-            annotation = self.get_object(kwargs.get("annotation_id")).id
+            obj = self.get_object(kwargs.get("annotation_id"))
+            annotation = obj.id
+            email_participants = confirm_email_and_participants(obj.email_id)
+
+            if email not in email_participants:
+                raise ValidationError(
+                    "Annotator email address not a part of this email thread"
+                )
+
             serializer = self.serializer_class(
                 data={**request.data, "annotation": annotation}
             )
@@ -407,6 +424,7 @@ class AnnotationCommentDetailView(RetrieveUpdateDestroyAPIView):
         annotation_id = kwargs.get("annotation_id")
         comment_id = kwargs.get("comment_id")
         allowed_update_fields = {"comment"}
+        email = request.data.get("author_email")
 
         if not request.data:
             response = CustomAPIResponse(
@@ -426,8 +444,15 @@ class AnnotationCommentDetailView(RetrieveUpdateDestroyAPIView):
 
         try:
             obj = self.get_object(
-                annotation_id, comment_id, request.data.get("author_email")
+                annotation_id, comment_id, email
             )  # since we don't manage authentication
+
+            email_participants = confirm_email_and_participants(obj.email_id)
+            if email not in email_participants:
+                raise ValidationError(
+                    "Annotator email address not a part of this email thread"
+                )
+
             serializer = self.serializer_class(obj, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()

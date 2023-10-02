@@ -75,16 +75,9 @@ def _confirm_email_extract(url, header, email_id):
 
 
 def confirm_email_participant(json_obj):
-    email_list = []
-
-    if obj_list := json_obj.get("cc"):
-        for emails in obj_list:
-            email_list.extend(em.get("email") for em in emails)
+    email_list = [em.get("email") for emails in json_obj.get("cc", []) for em in emails]
     email_list.extend(
-        (
-            json_obj.get("from")[0].get("email"),
-            json_obj.get("to")[0].get("email"),
-        )
+        [json_obj.get("from")[0].get("email"), json_obj.get("to")[0].get("email")]
     )
     return email_list
 

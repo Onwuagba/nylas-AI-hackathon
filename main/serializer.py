@@ -105,10 +105,7 @@ class RetrieveAnnotationSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         try:
-            query = self.Meta.model.objects.create(**validated_data)
-            query.save()
-
-            return query
+            return self.Meta.model.objects.create(**validated_data)
         except IntegrityError as ex:
             logger.error("An error occurred saving annotation: %s", ex)
             if "unique constraint" in str(ex.args):
